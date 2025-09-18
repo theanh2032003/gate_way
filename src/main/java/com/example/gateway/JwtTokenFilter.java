@@ -12,51 +12,65 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @Component
 public class JwtTokenFilter implements GlobalFilter, Ordered {
 
-    private final String secretKey = "theanh-2003-3002"; // bạn đổi thành key của bạn
+  private final String secretKey = "theanh-2003-3002";
 
-    @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        System.out.println("------------------------------------------------------");
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7);
+  private static final List<String> WHITELIST =
+      List.of("/auth/login", "/auth/register", "/auth/verify-otp");
 
-            try {
-                Claims claims = Jwts.parserBuilder()
-                        .setSigningKey(secretKey.getBytes(StandardCharsets.UTF_8))
-                        .build()
-                        .parseClaimsJws(token)
-                        .getBody();
+  @Override
+  public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+    String path = exchange.getRequest().getURI().getPath();
 
-                String userId = claims.getSubject();
-                String permission = (String) claims.get("permissions");
-                String orgId = (String) claims.get("orgId");
+    // Bỏ qua nếu thuộc whitelist
+    if (WHITELIST.stream().anyMatch(path::startsWith)) {
+      return chain.filter(exchange);
+    }
 
-                // Tạo request mới với header bổ sung
-                ServerHttpRequest mutatedRequest = exchange.getRequest()
-                        .mutate()
-                        .header("x-user-id", userId)
-                        .header("x-org-id", orgId)
-                        .header("x-org-permisisons", permission)
-                        .build();
+    String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+    System.out.println("------------------------------------------------------");
+    if (authHeader != null && authHeader.startsWith("Bearer ")) {
+      String token = authHeader.substring(7);
 
-                return chain.filter(exchange.mutate().request(mutatedRequest).build());
+      try {
+        Claims claims =
+            Jwts.parserBuilder()
+                .setSigningKey(secretKey.getBytes(StandardCharsets.UTF_8))
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
 
-            } catch (Exception e) {
-                // Token sai/expired → cho đi tiếp hoặc reject tuỳ nhu cầu
-                return chain.filter(exchange);
-            }
-        }
+        String userId = claims.getSubject();
+        String permission = (String) claims.get("permissions");
+        String orgId = (String) claims.get("orgId");
 
+        // Tạo request mới với header bổ sung
+        ServerHttpRequest mutatedRequest =
+            exchange
+                .getRequest()
+                .mutate()
+                .header("x-user-id", userId)
+                .header("x-org-id", orgId)
+                .header("x-org-permisisons", permission)
+                .build();
+
+        return chain.filter(exchange.mutate().request(mutatedRequest).build());
+
+      } catch (Exception e) {
+        // Token sai/expired → cho đi tiếp hoặc reject tuỳ nhu cầu
         return chain.filter(exchange);
+      }
     }
 
-    @Override
-    public int getOrder() {
-        return -1; // chạy sớm
-    }
+    return chain.filter(exchange);
+  }
+
+  @Override
+  public int getOrder() {
+    return -1;
+  }
 }
