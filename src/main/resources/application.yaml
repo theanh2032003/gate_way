@@ -1,15 +1,54 @@
 server:
-  port: 8080   # Gateway s? l?ng nghe ? c?ng 8080
+  port: 8080
 
 spring:
   application:
-    name: gateway
-  cloud:
-    gateway:
-      server:
-        webflux:
-#      routes:
-#        - id: user-service
-#          uri: http://localhost:8081        # service user ch?y c?ng 8081
-#          predicates:
-#            - Path=/users/**
+    name: api-gateway
+
+  datasource:
+    url: ${POSTGRESQL_DATABASE_URL}
+    username: ${POSTGRESQL_USERNAME}
+    password: ${POSTGRESQL_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    data:
+      #    mongodb:
+      #      uri: mongodb://localhost:27017/mydb
+
+      redis:
+        host: ${REDIS_HOST:localhost}
+        port: ${REDIS_PORT:6379}
+        timeout: 60000
+        lettuce:
+          pool:
+            max-active: 10
+            max-idle: 10
+            min-idle: 2
+
+    jpa:
+      hibernate:
+        ddl-auto: update
+      properties:
+        hibernate:
+          dialect: org.hibernate.dialect.PostgreSQLDialect
+      show-sql: true
+
+# Backend URL
+backend:
+  url: http://event-manager:8080  # hoặc http://backend-service:8081 trong Docker
+
+# JWT Secret
+jwt:
+  secret: ${JWT_SECRET:theanh-2003-3002}
+
+# Logging
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    com.example.gateway: DEBUG
+
+# Actuator (optional)
+#management:
+#  endpoints:
+#    web:
+#      exposure:
+#        include: health,info,gateway
